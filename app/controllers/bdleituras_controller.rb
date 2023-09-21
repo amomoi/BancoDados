@@ -14,7 +14,7 @@ class BdleiturasController < ApplicationController
     releaseCrossDomain
 
     if @bdsensor == Bdsensor.all
-      @bdleituras = Bdleitura.all
+      @bdleituras = Bdleitura.all.order('id DESC')
     else
       @bdleituras = Bdleitura.where(bdsensor_id: @bdsensor.id)
       .where(created_at: (Time.now.midnight - 6.day)..Time.now)
