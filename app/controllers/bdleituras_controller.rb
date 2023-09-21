@@ -17,6 +17,8 @@ class BdleiturasController < ApplicationController
       @bdleituras = Bdleitura.all
     else
       @bdleituras = Bdleitura.where(bdsensor_id: @bdsensor.id)
+      .where(created_at: (Time.now.midnight - 6.day)..Time.now)
+      .order('id ASC')
     end
 
   end
