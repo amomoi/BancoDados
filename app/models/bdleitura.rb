@@ -21,7 +21,7 @@ class Bdleitura < ApplicationRecord
             p "Sensor_ativo_inativo"
             results = Bdsensor.where("id=?", bdsensor_id).select(:ativo_inativo).pluck(:ativo_inativo)
             if results.all?(&:blank?) #= 'nil'
-                  sensor_ativo_inativo = ""
+                  sensor_ativo_inativo = nil
                   p sensor_ativo_inativo
             else 
                   sensor_ativo_inativo = Bdsensor.where("id=?", bdsensor_id).select(:ativo_inativo).pluck(:ativo_inativo).first.to_i
@@ -35,7 +35,7 @@ class Bdleitura < ApplicationRecord
             p "LI"
             results = Bdsensor.where("id = ?", bdsensor_id).select(:LI).pluck(:LI)
             if results.all?(&:blank?) #= 'nil'
-                  limite_inferior = ""
+                  limite_inferior = nil
                   puts "limite_inferior = vazio"
             else 
                   limite_inferior = Bdsensor.where("id = ?", bdsensor_id).select(:LI).pluck(:LI).first.to_f
@@ -45,7 +45,7 @@ class Bdleitura < ApplicationRecord
             p "LS"
             results = Bdsensor.where("id = ?", bdsensor_id).select(:LS).pluck(:LS)
             if results.all?(&:blank?) #= 'nil'
-                  limite_superior = ""
+                  limite_superior = nil
                   p "limite_superior = vazio"               
             else 
                   limite_superior = Bdsensor.where("id = ?", bdsensor_id).select(:LS).pluck(:LS).first.to_f
@@ -70,7 +70,7 @@ class Bdleitura < ApplicationRecord
             p "Flag notificacao"
             results = Bdsensor.where("id = ?", bdsensor_id).select(:flag_notificacao).pluck(:flag_notificacao)
             if results.all?(&:blank?) #= 'nil'
-                  p flag_notificacao = ""
+                  p flag_notificacao = nil
             else 
                   flag_notificacao = Bdsensor.where("id = ?", bdsensor_id).select(:flag_notificacao).pluck(:flag_notificacao).first.to_i
                   p flag_notificacao
@@ -79,7 +79,7 @@ class Bdleitura < ApplicationRecord
             p "Flag rearme"
             results = Bdsensor.where("id = ?", bdsensor_id).select(:flag_rearme).pluck(:flag_rearme)
             if results.all?(&:blank?) #= 'nil'
-                  p flag_rearme = ""                  
+                  p flag_rearme = nil                 
             else 
                   flag_rearme = Bdsensor.where("id = ?", bdsensor_id).select(:flag_rearme).pluck(:flag_rearme).first.to_i
                   p flag_rearme
@@ -88,7 +88,7 @@ class Bdleitura < ApplicationRecord
             p "Flag mantec"
             results = Bdsensor.where("id = ?", bdsensor_id).select(:flag_mantec).pluck(:flag_mantec)
             if results.all?(&:blank?) #= 'nil'
-                  p flag_mantec = ""
+                  p flag_mantec = nil
             else 
                   flag_mantec = Bdsensor.where("id = ?", bdsensor_id).select(:flag_mantec).pluck(:flag_mantec).first.to_i
                   p flag_mantec
