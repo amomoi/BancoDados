@@ -94,37 +94,41 @@ class Bdleitura < ApplicationRecord
                   p flag_mantec
             end
 
-            # Garantir que os flags estão em inteiros (evita "" atrapalhar)
-            # flag_mantec       = flag_mantec.to_i
-            # flag_rearme       = flag_rearme.to_i
-            # flag_notificacao  = flag_notificacao.to_i
+            # Carregue LI e LS como nil quando não existirem
+            li_raw = Bdsensor.where(id: bdsensor_id).pick(:LI)
+            ls_raw = Bdsensor.where(id: bdsensor_id).pick(:LS)
+
+            limite_inferior = li_raw.present? ? li_raw.to_f : nil
+            limite_superior = ls_raw.present? ? ls_raw.to_f : nil
+
+            valor_f = valor.to_f
+
+            # Avalia cada lado só se o limite existir
+            violou_inferior = limite_inferior.present? && (valor_f <= limite_inferior)
+            violou_superior = limite_superior.present? && (valor_f >= limite_superior)
+
+            fora_do_limite = violou_inferior || violou_superior
+
+            Rails.logger.info "LI=#{limite_inferior.inspect} LS=#{limite_superior.inspect} " \
+                   "valor=#{valor_f} => violou_inf=#{violou_inferior} violou_sup=#{violou_superior}"
 
             sensor = Bdsensor.find_by(id: bdsensor_id)
 
-            # === VERIFICA SE LIMITES EXISTEM ===
-            # if limite_inferior.blank? || limite_superior.blank?
-            # Rails.logger.info "Sem limites definidos (LI ou LS vazio/nil). Nenhuma ação será feita."
-            # return
-            # end
-
-            # === APLICAÇÃO DA LÓGICA DA TABELA ===
-
-            if flag_mantec == 1
-                  # Sempre zera rearme e ajusta notificacao conforme tabela
+            if flag_mantec.to_i == 1
                   sensor.update(flag_rearme: 0, flag_notificacao: 0)
-                  Rails.logger.info "Manutenção ativada, flags ajustados"
-            elsif #flag_mantec = 0
-                  if valor < limite_inferior || valor > limite_superior
-                        if flag_notificacao ==0 
-                              sensor.update(flag_notificacao: 1)
-                              Rails.logger.info "Notificação ativada (fora do limite)"
-                        end
-
+                  Rails.logger.info "Manutenção ativada, flags zerados"
+            else
+                  if fora_do_limite
+                        # fora do(s) limite(s)
+                        sensor.update(flag_notificacao: 1) if flag_notificacao.to_i == 0
+                        Rails.logger.info "Notificação ativada (fora do limite)"
                   else
+                        # dentro do(s) limite(s) definidos (ou nenhum limite definido)
                         sensor.update(flag_notificacao: 0)
+                        Rails.logger.info "Valor dentro dos limites definidos; notificação=0"
                   end
-
             end
+
 
           
 
