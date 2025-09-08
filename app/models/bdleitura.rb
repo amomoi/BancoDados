@@ -95,9 +95,9 @@ class Bdleitura < ApplicationRecord
             end
 
             # Garantir que os flags estão em inteiros (evita "" atrapalhar)
-            flag_mantec       = flag_mantec.to_i
-            flag_rearme       = flag_rearme.to_i
-            flag_notificacao  = flag_notificacao.to_i
+            # flag_mantec       = flag_mantec.to_i
+            # flag_rearme       = flag_rearme.to_i
+            # flag_notificacao  = flag_notificacao.to_i
 
             sensor = Bdsensor.find_by(id: bdsensor_id)
 
