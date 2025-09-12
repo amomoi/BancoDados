@@ -1,133 +1,73 @@
 class Bdleitura < ApplicationRecord
     belongs_to :bdsensor
 
-
     before_save :check_status
 
     def check_status  
-            #VERIFICA SE CLIENTE E SENSOR ESTA ATIVO
-            p "Cliente"
-            cliente = Bdsensor.where("id = ?", bdsensor_id).select(:bdcliente_id).pluck(:bdcliente_id)
-            p cliente[0]
+        # Carrega o sensor e o cliente associado de uma vez
+        sensor = Bdsensor.find_by(id: bdsensor_id)
+        # Se o sensor não existir, aborta o salvamento
+        unless sensor
+            errors.add(:base, "Sensor não encontrado.")
+            throw(:abort)
+        end
 
-            p "Cliente_ativo_inativo"
-            cliente_ativo_inativo = Bdcliente.where("id=?", cliente[0]).select(:ativo_inativo).pluck(:ativo_inativo).first.to_i
-            p cliente_ativo_inativo
+        cliente = Bdcliente.find_by(id: sensor.bdcliente_id)
+        # Se o cliente não existir, aborta o salvamento
+        unless cliente
+            errors.add(:base, "Cliente não encontrado.")
+            throw(:abort)
+        end
 
-            p "Sensor_ID"
-            id_sensor = Bdsensor.where("id=?", bdsensor_id).pluck(:id).first
-            p id_sensor
+        p "Cliente: #{cliente.id}"
+        p "Cliente Ativo/Inativo: #{cliente.ativo_inativo}"
+        p "Sensor ID: #{sensor.id}"
+        p "Sensor Ativo/Inativo: #{sensor.ativo_inativo}"
 
-            p "Sensor_ativo_inativo"
-            results = Bdsensor.where("id=?", bdsensor_id).select(:ativo_inativo).pluck(:ativo_inativo)
-            if results.all?(&:blank?) #= 'nil'
-                  sensor_ativo_inativo = nil
-                  p sensor_ativo_inativo
-            else 
-                  sensor_ativo_inativo = Bdsensor.where("id=?", bdsensor_id).select(:ativo_inativo).pluck(:ativo_inativo).first.to_i
-                  p sensor_ativo_inativo
+        # Carrega as flags e limites uma única vez do objeto sensor carregado
+        flag_notificacao = sensor.flag_notificacao.to_i
+        flag_rearme = sensor.flag_rearme.to_i
+        flag_mantec = sensor.flag_mantec.to_i
+        limite_inferior = sensor.LI.to_f if sensor.LI.present?
+        limite_superior = sensor.LS.to_f if sensor.LS.present?
+        
+        valor_f = valor.to_f # 'valor' é o atributo da Bdleitura que está sendo salva
+
+        # Lógica de verificação de status do cliente e sensor
+        if cliente.ativo_inativo != 1 || sensor.ativo_inativo != 1
+            errors.add(:base, "Salvamento cancelado pois cliente ou sensor está inativo.")
+            throw(:abort)
+        end
+
+        # Lógica de Manutenção (flag_mantec)
+        if flag_mantec == 1
+            sensor.update(flag_rearme: 0, flag_notificacao: 0)
+            Rails.logger.info "Manutenção ativada para Sensor #{sensor.id}, flags zerados: flag_rearme=0, flag_notificacao=0"
+            # Importante: Como a manutenção está ativa, não faremos mais nada para esta leitura
+            return # Sai do método check_status
+        end
+
+        # Lógica de verificação de limites (se não estiver em manutenção)
+        violou_inferior = limite_inferior.present? && (valor_f <= limite_inferior)
+        violou_superior = limite_superior.present? && (valor_f >= limite_superior)
+        fora_do_limite = violou_inferior || violou_superior
+
+        Rails.logger.info "Sensor #{sensor.id} - LI=#{limite_inferior.inspect} LS=#{limite_superior.inspect} " \
+                       "Valor=#{valor_f} => violou_inf=#{violou_inferior} violou_sup=#{violou_superior}"
+
+        if fora_do_limite
+            # fora do(s) limite(s)
+            if flag_notificacao == 0 # Só atualiza para 1 se ainda não estiver 1
+                sensor.update(flag_notificacao: 1)
+                Rails.logger.info "Sensor #{sensor.id} - Notificação ativada (fora do limite): flag_notificacao=1"
             end
-
-            p "Usuarios" #APENAS FOLLOW
-            usuarios = Bdusuario.where("bdcliente_id = ?", cliente[0]).select(:celular).select(:SMS).pluck(:celular, :SMS)
-            p usuarios
-
-            p "LI"
-            results = Bdsensor.where("id = ?", bdsensor_id).select(:LI).pluck(:LI)
-            if results.all?(&:blank?) #= 'nil'
-                  limite_inferior = nil
-                  puts "limite_inferior = vazio"
-            else 
-                  limite_inferior = Bdsensor.where("id = ?", bdsensor_id).select(:LI).pluck(:LI).first.to_f
-                  puts "limite_inferior = #{limite_inferior}"
+        else
+            # dentro do(s) limite(s) definidos (ou nenhum limite definido)
+            if flag_notificacao == 1 || flag_rearme == 1 # Só atualiza se precisar zerar
+                sensor.update(flag_notificacao: 0, flag_rearme: 0)
+                Rails.logger.info "Sensor #{sensor.id} - Valor dentro dos limites; flags zerados: flag_notificacao=0, flag_rearme=0"
             end
-
-            p "LS"
-            results = Bdsensor.where("id = ?", bdsensor_id).select(:LS).pluck(:LS)
-            if results.all?(&:blank?) #= 'nil'
-                  limite_superior = nil
-                  p "limite_superior = vazio"               
-            else 
-                  limite_superior = Bdsensor.where("id = ?", bdsensor_id).select(:LS).pluck(:LS).first.to_f
-                  p "limite_superior = #{limite_superior})"
-            end
-
-             p "Valor anterior"
-            results = Bdleitura.where("bdsensor_id = ?", bdsensor_id).select(:valor)
-            if results.all?(&:blank?) #= 'nil'
-                  p ""
-                  p "Valor"
-                  p valor
-            else 
-                  valor_anterior = valor_anterior = Bdleitura.where("bdsensor_id = ?", bdsensor_id).select(:valor).last
-                  p "Valor anterior"
-                  p valor_anterior.valor
-                  p "Valor atual"
-                  p valor
-            end  
-
-
-            p "Flag notificacao"
-            results = Bdsensor.where("id = ?", bdsensor_id).select(:flag_notificacao).pluck(:flag_notificacao)
-            if results.all?(&:blank?) #= 'nil'
-                  p flag_notificacao = nil
-            else 
-                  flag_notificacao = Bdsensor.where("id = ?", bdsensor_id).select(:flag_notificacao).pluck(:flag_notificacao).first.to_i
-                  p flag_notificacao
-            end
-
-            p "Flag rearme"
-            results = Bdsensor.where("id = ?", bdsensor_id).select(:flag_rearme).pluck(:flag_rearme)
-            if results.all?(&:blank?) #= 'nil'
-                  p flag_rearme = nil                 
-            else 
-                  flag_rearme = Bdsensor.where("id = ?", bdsensor_id).select(:flag_rearme).pluck(:flag_rearme).first.to_i
-                  p flag_rearme
-            end
-
-            p "Flag mantec"
-            results = Bdsensor.where("id = ?", bdsensor_id).select(:flag_mantec).pluck(:flag_mantec)
-            if results.all?(&:blank?) #= 'nil'
-                  p flag_mantec = nil
-            else 
-                  flag_mantec = Bdsensor.where("id = ?", bdsensor_id).select(:flag_mantec).pluck(:flag_mantec).first.to_i
-                  p flag_mantec
-            end
-
-            # Carregue LI e LS como nil quando não existirem
-            li_raw = Bdsensor.where(id: bdsensor_id).pick(:LI)
-            ls_raw = Bdsensor.where(id: bdsensor_id).pick(:LS)
-
-            limite_inferior = li_raw.present? ? li_raw.to_f : nil
-            limite_superior = ls_raw.present? ? ls_raw.to_f : nil
-
-            valor_f = valor.to_f
-
-            # Avalia cada lado só se o limite existir
-            violou_inferior = limite_inferior.present? && (valor_f <= limite_inferior)
-            violou_superior = limite_superior.present? && (valor_f >= limite_superior)
-
-            fora_do_limite = violou_inferior || violou_superior
-
-            Rails.logger.info "LI=#{limite_inferior.inspect} LS=#{limite_superior.inspect} " \
-                   "valor=#{valor_f} => violou_inf=#{violou_inferior} violou_sup=#{violou_superior}"
-
-            sensor = Bdsensor.find_by(id: bdsensor_id)
-
-            if flag_mantec.to_i == 1
-                  sensor.update(flag_rearme: 0, flag_notificacao: 0)
-                  Rails.logger.info "Manutenção ativada, flags zerados"
-            else
-                  if fora_do_limite
-                        # fora do(s) limite(s)
-                        sensor.update(flag_notificacao: 1) if flag_notificacao.to_i == 0
-                        Rails.logger.info "Notificação ativada (fora do limite)"
-                  else
-                        # dentro do(s) limite(s) definidos (ou nenhum limite definido)
-                        sensor.update(flag_notificacao: 0)
-                        Rails.logger.info "Valor dentro dos limites definidos; notificação=0"
-                  end
-            end
+        end
 
 
           
