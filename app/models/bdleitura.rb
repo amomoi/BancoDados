@@ -25,8 +25,8 @@ class Bdleitura < ApplicationRecord
         p "Sensor Ativo/Inativo: #{sensor.ativo_inativo}"
 
         # Carrega as flags e limites uma única vez do objeto sensor carregado
-        flag_notificacao = sensor.flag_notificacao.to_i
-        flag_rearme = sensor.flag_rearme.to_i
+        # Usaremos sensor.flag_notificacao diretamente para obter o valor mais recente
+        # e atualizá-lo em memória se o banco for atualizado.
         flag_mantec = sensor.flag_mantec.to_i
         limite_inferior = sensor.LI.to_f if sensor.LI.present?
         limite_superior = sensor.LS.to_f if sensor.LS.present?
@@ -41,9 +41,9 @@ class Bdleitura < ApplicationRecord
 
         # Lógica de Manutenção (flag_mantec)
         if flag_mantec == 1
+            # Atualiza o banco de dados e imediatamente atualiza o objeto `sensor` em memória
             sensor.update(flag_rearme: 0, flag_notificacao: 0)
             Rails.logger.info "Manutenção ativada para Sensor #{sensor.id}, flags zerados: flag_rearme=0, flag_notificacao=0"
-            # Importante: Como a manutenção está ativa, não faremos mais nada para esta leitura
             return # Sai do método check_status
         end
 
@@ -55,20 +55,26 @@ class Bdleitura < ApplicationRecord
         Rails.logger.info "Sensor #{sensor.id} - LI=#{limite_inferior.inspect} LS=#{limite_superior.inspect} " \
                        "Valor=#{valor_f} => violou_inf=#{violou_inferior} violou_sup=#{violou_superior}"
 
+        # Obtém o valor atual da flag_notificacao ANTES de qualquer alteração,
+        # para decidir se a notificação precisa ser ativada/desativada.
+        current_flag_notificacao = sensor.flag_notificacao.to_i
+        current_flag_rearme = sensor.flag_rearme.to_i
+
         if fora_do_limite
             # fora do(s) limite(s)
-            if flag_notificacao == 0 # Só atualiza para 1 se ainda não estiver 1
+            if current_flag_notificacao == 0 # Só atualiza para 1 se ainda não estiver 1
                 sensor.update(flag_notificacao: 1)
+                # O objeto `sensor` em memória agora tem o novo valor de flag_notificacao
                 Rails.logger.info "Sensor #{sensor.id} - Notificação ativada (fora do limite): flag_notificacao=1"
             end
         else
             # dentro do(s) limite(s) definidos (ou nenhum limite definido)
-            if flag_notificacao == 1 || flag_rearme == 1 # Só atualiza se precisar zerar
+            if current_flag_notificacao == 1 || current_flag_rearme == 1 # Só atualiza se precisar zerar
                 sensor.update(flag_notificacao: 0, flag_rearme: 0)
+                # O objeto `sensor` em memória agora tem os novos valores
                 Rails.logger.info "Sensor #{sensor.id} - Valor dentro dos limites; flags zerados: flag_notificacao=0, flag_rearme=0"
             end
         end
-
 
           
 
