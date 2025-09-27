@@ -30,6 +30,11 @@ class Bdleitura < ApplicationRecord
         flag_mantec = sensor.flag_mantec.to_i
         limite_inferior = sensor.LI.to_f if sensor.LI.present?
         limite_superior = sensor.LS.to_f if sensor.LS.present?
+
+        # --- Inicializa valor_f SEMPRE com o valor da leitura ---
+        valor_f = self.valor.to_f # 'valor' é o atributo da Bdleitura que está sendo salva
+                                 # Garante que valor_f sempre tenha um valor float da leitura.
+
         
         #valor_f = valor.to_f # 'valor' é o atributo da Bdleitura que está sendo salva
 
