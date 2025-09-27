@@ -31,7 +31,20 @@ class Bdleitura < ApplicationRecord
         limite_inferior = sensor.LI.to_f if sensor.LI.present?
         limite_superior = sensor.LS.to_f if sensor.LS.present?
         
-        valor_f = valor.to_f # 'valor' é o atributo da Bdleitura que está sendo salva
+        #valor_f = valor.to_f # 'valor' é o atributo da Bdleitura que está sendo salva
+
+        # --- NOVA LÓGICA PARA ARG5 (CALIBRAÇÃO) ---
+        if sensor.arg5.present?
+            calibracao_offset = sensor.arg5.to_f
+            self.valor = (calibracao_offset).to_s # Aplica o offset e salva como string
+            Rails.logger.info "Sensor #{sensor.id} - Calibração aplicada: valor offset '#{calibracao_offset}' = novo valor '#{self.valor}'"
+            
+            # Zera arg5 imediatamente após usar
+            sensor.update(arg5: nil) # Ou sensor.update(arg5: "") dependendo do que a API espera para "vazio"
+            Rails.logger.info "Sensor #{sensor.id} - arg5 zerado após uso."
+            valor_f = self.valor.to_f # Atualiza valor_f para a lógica de limites a seguir
+        end
+        # --- FIM DA NOVA LÓGICA ---
 
         # Lógica de verificação de status do cliente e sensor
         if cliente.ativo_inativo != 1 || sensor.ativo_inativo != 1
@@ -60,25 +73,31 @@ class Bdleitura < ApplicationRecord
         current_flag_notificacao = sensor.flag_notificacao.to_i
         current_flag_rearme = sensor.flag_rearme.to_i
 
-        if fora_do_limite
-            # fora do(s) limite(s)
-            if current_flag_notificacao == 0 # Só atualiza para 1 se ainda não estiver 1
-                sensor.update(flag_notificacao: 1)
-                # O objeto `sensor` em memória agora tem o novo valor de flag_notificacao
-                Rails.logger.info "Sensor #{sensor.id} - Notificação ativada (fora do limite): flag_notificacao=1"
+            if fora_do_limite
+                  # fora do(s) limite(s)
+                  if current_flag_notificacao == 0 # Só atualiza para 1 se ainda não estiver 1
+                  sensor.update(flag_notificacao: 1)
+                  # O objeto `sensor` em memória agora tem o novo valor de flag_notificacao
+                  Rails.logger.info "Sensor #{sensor.id} - Notificação ativada (fora do limite): flag_notificacao=1"
+                  end
+            else
+                  # dentro do(s) limite(s) definidos (ou nenhum limite definido)
+                  if current_flag_notificacao == 1 || current_flag_rearme == 1 # Só atualiza se precisar zerar
+                  sensor.update(flag_notificacao: 0, flag_rearme: 0)
+                  # O objeto `sensor` em memória agora tem os novos valores
+                  Rails.logger.info "Sensor #{sensor.id} - Valor dentro dos limites; flags zerados: flag_notificacao=0, flag_rearme=0"
+                  end
             end
-        else
-            # dentro do(s) limite(s) definidos (ou nenhum limite definido)
-            if current_flag_notificacao == 1 || current_flag_rearme == 1 # Só atualiza se precisar zerar
-                sensor.update(flag_notificacao: 0, flag_rearme: 0)
-                # O objeto `sensor` em memória agora tem os novos valores
-                Rails.logger.info "Sensor #{sensor.id} - Valor dentro dos limites; flags zerados: flag_notificacao=0, flag_rearme=0"
-            end
-        end
+            
+      end
+end
 
-          
+# O bloco de código comentado abaixo da classe não faz parte da classe e não será executado
+# a menos que esteja dentro de um método ou uma inicialização. Mantenha-o fora da classe.
+# Para SMS, geralmente essa lógica fica em um service ou job separado, ou dentro do BdleituraController
+# após o salvamento da leitura, se for algo a ser feito logo em seguida.
 
-            # if cliente_ativo_inativo == 1 && sensor_ativo_inativo == 1
+# if cliente_ativo_inativo == 1 && sensor_ativo_inativo == 1
             #       sms_ativo = Bdusuario.where("Bdcliente_id = ?", cliente[0]).select(:SMS).select(:nome).select(:ativo_inativo).select(:celular)
 
             #       sms_ativo.each do |s|
@@ -183,7 +202,3 @@ class Bdleitura < ApplicationRecord
                   # errors.add(:base, "Salvamento cancelado pois cliente ou sensor esta inativo")
                   # throw(:abort)
             #end
-            
-      end
-
-end
